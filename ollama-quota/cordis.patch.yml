@@ -1,0 +1,10 @@
+- insert:
+    - id: ollama-quota
+      name: '@local/ollama-quota'
+      config:
+        # Credential reference holding the Ollama Cloud API key, and how long the
+        # Host caches one balance answer. The endpoint allows 10 requests per
+        # minute per user, so keep refreshSeconds at 60 or more.
+        apiKeyEnv: OLLAMA_CLOUD_API_KEY
+        baseUrl: https://ollama.com
+        refreshSeconds: 60

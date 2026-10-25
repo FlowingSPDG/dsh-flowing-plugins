@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DeepSeek ピーク表示",
+    "description": "Ollama Cloud の DeepSeek-V4.1-Flash が今ピークタイムかオフピークタイムかを、切り替わりまでの残り時間つきで表示します。"
+  }
+}

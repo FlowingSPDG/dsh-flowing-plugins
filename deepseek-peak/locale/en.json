@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DeepSeek Peak Status",
+    "description": "Shows whether DeepSeek-V4.1-Flash on Ollama Cloud currently bills at the peak or off-peak rate, with the time left on that side of the boundary."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Ollama Cloud 残高",
+    "description": "Ollama Cloud の残りクレジットと、このセッションで使ったトークン数を入力欄下の統計行に表示します。"
+  }
+}

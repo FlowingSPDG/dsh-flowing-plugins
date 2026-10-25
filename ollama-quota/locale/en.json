@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Ollama Cloud Quota",
+    "description": "Shows the remaining Ollama Cloud credit and this Session's token totals on the composer's stats row."
+  }
+}
