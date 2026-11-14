@@ -99,19 +99,19 @@ window.__ModuleLoader__.load({
 .oq-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  padding: 1px 8px 1px 6px;
-  border-radius: 999px;
+  padding: 1px 8px;
+  border-radius: var(--dsw-radius-sm);
   color: var(--dsw-alias-label-secondary);
-  font: inherit;
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
   font-variant-numeric: tabular-nums;
-  line-height: inherit;
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
   white-space: nowrap;
 }
-.oq-chip svg { width: 13px; height: 13px; flex: none; }
+.oq-chip svg { width: 14px; height: 14px; flex: none; }
 .oq-chip[data-tone='warn'] { color: var(--dsw-alias-state-warn-primary); }
 .oq-chip[data-tone='error'] { color: var(--dsw-alias-state-error-primary); }
 .oq-chip[data-tone='muted'] { color: var(--dsw-alias-label-secondary); opacity: 0.75; }
