@@ -1,7 +1,7 @@
 # dsh-flowing-plugins
 
 Small [DeepSeek Harness](https://github.com/deepseek-ai) (DSH) Web UI plugins for
-the composer's session-stats row. Each package is self-contained plain
+the composer's dock. Each package is self-contained plain
 JavaScript: no build step, no dependencies, no install scripts.
 
 | Package | What it shows |
@@ -9,8 +9,8 @@ JavaScript: no build step, no dependencies, no install scripts.
 | [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit, plus the tokens this Session has used. |
 | [`deepseek-peak/`](deepseek-peak) | Whether DeepSeek-V4.1-Flash currently bills at the peak or off-peak rate, and the time left on it. |
 
-Both render as ambient chips in the `conversation.composer.stats.lead` slot,
-below the composer card and next to the shipped branch chip. Copy is Japanese
+Both render as ambient chips in the `conversation.composer.dock` slot, below
+the composer card alongside the context meter and the live-speed chip. Copy is Japanese
 and English; the chip follows the active DSH language.
 
 ## Install

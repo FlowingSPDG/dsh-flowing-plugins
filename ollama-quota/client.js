@@ -1,7 +1,7 @@
 /**
  * Browser half of the Ollama Cloud quota chips.
  *
- * Renders two entries in the composer's session-stats lead seat:
+ * Renders two entries in the composer's dock, beside the context meter:
  *
  * - the remaining Ollama Cloud credit, read from this package's Host half over
  *   its private Connection RPC channel (the API key never reaches the browser);
@@ -390,16 +390,16 @@ window.__ModuleLoader__.load({
 
         const injected = () => ({ readBalance })
 
-        ctx.slots.inject('conversation.composer.stats.lead', () => ctx.slots.register({
-          name: 'conversation.composer.stats.lead',
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
           id: 'ollama-balance',
           order: 20,
           locale: NS,
           inject: injected,
         }, BalanceChip))
 
-        ctx.slots.inject('conversation.composer.stats.lead', () => ctx.slots.register({
-          name: 'conversation.composer.stats.lead',
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
           id: 'session-tokens',
           order: 30,
           locale: NS,

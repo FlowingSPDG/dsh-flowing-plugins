@@ -190,8 +190,8 @@ window.__ModuleLoader__.load({
 
         ctx.effect(() => ctx.locale.register(NS, { ja, en }), 'deepseek-peak: dictionaries')
 
-        ctx.slots.inject('conversation.composer.stats.lead', () => ctx.slots.register({
-          name: 'conversation.composer.stats.lead',
+        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+          name: 'conversation.composer.dock',
           id: 'deepseek-peak',
           order: 40,
           locale: NS,
