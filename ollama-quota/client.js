@@ -1,15 +1,12 @@
 /**
- * Browser half of the Ollama Cloud quota chips.
+ * Browser half of the Ollama Cloud quota chip.
  *
- * Renders two entries in the composer's dock, beside the context meter:
- *
- * - the remaining Ollama Cloud credit, read from this package's Host half over
- *   its private Connection RPC channel (the API key never reaches the browser);
- * - the tokens this Session has used, read from the durable `tokenUsage`
- *   projection the Host computes over the complete session log.
- *
- * Both figures are ambient: no dialog, no DOM outside the slot, and the only
- * styles are this module's own inserted stylesheet.
+ * Renders one entry in the composer's dock, beside the context meter. It shows
+ * the remaining Ollama Cloud credit, read from this package's Host half over
+ * its private Connection RPC channel (the API key never reaches the browser),
+ * and the full breakdown on the shipped hover tooltip. Session tokens are left
+ * to the shipped `usage` pill. The only styles are this module's own inserted
+ * stylesheet.
  *
  * @module @local/ollama-quota/client
  */
@@ -18,6 +15,7 @@ window.__ModuleLoader__.load({
   id: '@local/ollama-quota',
   factory(require) {
     const React = require('react')
+    const { Tooltip } = require('@deepseek-ai/dsh-client-ui-primitives')
     const h = React.createElement
 
     /** Locale namespace owned by this bundle. */
@@ -52,16 +50,6 @@ window.__ModuleLoader__.load({
       'balance.weekly': '週次残り',
       'balance.updated': '取得時刻',
       'balance.retryAfter': '{seconds} 秒後に再試行してください。',
-      'tokens.label': '↑{input} ↓{output}',
-      'tokens.title': 'このセッションのトークン',
-      'tokens.total': '合計',
-      'tokens.input': '未キャッシュ入力',
-      'tokens.cacheRead': 'キャッシュ読取',
-      'tokens.cacheWrite': 'キャッシュ書込',
-      'tokens.output': '出力',
-      'tokens.hit': 'キャッシュヒット率',
-      'number.thousand': '{value}K',
-      'number.million': '{value}M',
     }
 
     const en = {
@@ -83,16 +71,6 @@ window.__ModuleLoader__.load({
       'balance.weekly': 'Week left',
       'balance.updated': 'Read at',
       'balance.retryAfter': 'Try again in {seconds} seconds.',
-      'tokens.label': '↑{input} ↓{output}',
-      'tokens.title': 'Tokens in this session',
-      'tokens.total': 'Total',
-      'tokens.input': 'Uncached input',
-      'tokens.cacheRead': 'Cache read',
-      'tokens.cacheWrite': 'Cache write',
-      'tokens.output': 'Output',
-      'tokens.hit': 'Cache hit',
-      'number.thousand': '{value}K',
-      'number.million': '{value}M',
     }
 
     const CSS = `
@@ -121,19 +99,6 @@ window.__ModuleLoader__.load({
     /** Coerce to a finite number, or 0. */
     function num(value) {
       return typeof value === 'number' && Number.isFinite(value) ? value : 0
-    }
-
-    /** One-decimal compact value: 12.2, 517, 1.2. */
-    function scaled(value) {
-      return value >= 100 ? String(Math.round(value)) : String(Math.round(value * 10) / 10)
-    }
-
-    /** Compact token count under the namespace's own K/M words. */
-    function compactTokens(value, t) {
-      const tokens = Math.max(0, num(value))
-      if (tokens < 1_000) return String(Math.round(tokens))
-      if (tokens < 1_000_000) return t('number.thousand', { value: scaled(tokens / 1_000) })
-      return t('number.million', { value: scaled(tokens / 1_000_000) })
     }
 
     /** USD amount with two decimals, falling back where Intl currency is unavailable. */
@@ -172,13 +137,13 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** One labelled row inside a native tooltip. */
+    /** One labelled row inside the banner. */
     function line(label, value) {
       return `${label}: ${value}`
     }
 
     /**
-     * Fold one wire snapshot into the chip's text, tone, and tooltip.
+     * Fold one wire snapshot into the chip's text, tone, and banner detail.
      * @param snapshot - the Host half's balance answer.
      * @param t - namespace translate function.
      * @returns display parts.
@@ -268,13 +233,6 @@ window.__ModuleLoader__.load({
         }))
     }
 
-    /** A token-count glyph: a stacked pair of blocks. */
-    function TokenIcon() {
-      return h('svg', { viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
-        h('rect', { x: 2.2, y: 3.1, width: 11.6, height: 3.4, rx: 1.1, stroke: 'currentColor', strokeWidth: 1.3 }),
-        h('rect', { x: 2.2, y: 9.5, width: 7.2, height: 3.4, rx: 1.1, stroke: 'currentColor', strokeWidth: 1.3 }))
-    }
-
     /**
      * Ask the Host half for the balance, retrying once per poll interval so a
      * transient failure heals without a page reload.
@@ -312,46 +270,17 @@ window.__ModuleLoader__.load({
       const { t, readBalance } = props
       const snapshot = useBalance(readBalance)
       const view = describeBalance(snapshot, t)
-      return h('span', {
+      return h(Tooltip, {
+        label: view.title,
+        side: 'top',
+        portal: true,
+        openOnClick: true,
+        delayMs: 200,
+      }, h('span', {
         className: 'oq-chip',
         'data-tone': view.tone,
         'data-ollama-balance': view.tone,
-        title: view.title,
-      }, h(CoinIcon), h('span', { className: 'oq-label' }, view.label))
-    }
-
-    /**
-     * Whole-session tokens from the durable `tokenUsage` projection: input and
-     * output at a glance, every billing bucket in the tooltip.
-     */
-    function SessionTokensChip(props) {
-      const { t, useProjection } = props
-      const usage = useProjection('tokenUsage')
-      if (usage === null || typeof usage !== 'object') return null
-      const input = num(usage.uncachedInputTokens) + num(usage.cacheReadTokens) + num(usage.cacheWriteTokens)
-      const output = num(usage.outputTokens)
-      const total = input + output
-      if (total <= 0) return null
-      const billed = input
-      const cached = num(usage.cacheReadTokens)
-      const rows = [
-        t('tokens.title'),
-        line(t('tokens.total'), String(total)),
-        line(t('tokens.input'), String(num(usage.uncachedInputTokens))),
-        line(t('tokens.cacheRead'), String(cached)),
-      ]
-      if (num(usage.cacheWriteTokens) > 0) rows.push(line(t('tokens.cacheWrite'), String(num(usage.cacheWriteTokens))))
-      rows.push(line(t('tokens.output'), String(output)))
-      if (billed > 0) rows.push(line(t('tokens.hit'), `${String(Math.min(100, Math.round((cached / billed) * 100)))}%`))
-      return h('span', {
-        className: 'oq-chip',
-        'data-tone': 'ok',
-        'data-session-tokens': String(total),
-        title: rows.join('\n'),
-      }, h(TokenIcon), h('span', { className: 'oq-label' }, t('tokens.label', {
-        input: compactTokens(input, t),
-        output: compactTokens(output, t),
-      })))
+      }, h(CoinIcon), h('span', { className: 'oq-label' }, view.label)))
     }
 
     return {
@@ -397,14 +326,6 @@ window.__ModuleLoader__.load({
           locale: NS,
           inject: injected,
         }, BalanceChip))
-
-        ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-          name: 'conversation.composer.dock',
-          id: 'session-tokens',
-          order: 30,
-          locale: NS,
-          inject: injected,
-        }, SessionTokensChip))
       },
     }
   },

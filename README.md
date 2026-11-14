@@ -6,12 +6,14 @@ JavaScript: no build step, no dependencies, no install scripts.
 
 | Package | What it shows |
 |---|---|
-| [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit, plus the tokens this Session has used. |
+| [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit. |
 | [`deepseek-peak/`](deepseek-peak) | Whether DeepSeek-V4.1-Flash currently bills at the peak or off-peak rate, and the time left on it. |
 
 Both render as ambient chips in the `conversation.composer.dock` slot, below
-the composer card alongside the context meter and the live-speed chip. Copy is Japanese
-and English; the chip follows the active DSH language.
+the composer card alongside the shipped stat pills and the live-speed chip.
+Hovering a chip opens the shipped tooltip with the full breakdown (a tap pins it
+on touch screens); neither package shows an app-wide alert. Copy is Japanese and
+English; the chip follows the active DSH language.
 
 ## Install
 
@@ -39,18 +41,17 @@ The same installs are available from the agent side through
 
 ## `ollama-quota`
 
-Two chips:
+One chip:
 
 - **Balance** — remaining included credit and allowance, for example
-  `$50.29/$60.00`. The tooltip adds the purchased credit, the total, the current
+  `$50.29/$60.00`. Hovering it adds the purchased credit, the total, the current
   period, and when the reading was taken. A failed refresh keeps the last
   reading and marks the chip as stale; an unconfigured key shows
   `Ollama 未設定` / `Ollama not set up` instead of a guess.
-- **Session tokens** — `↑input ↓output` over the whole Session, read from the
-  durable `tokenUsage` projection the Host folds from the complete session log,
-  so paging and compaction do not change it. The tooltip lists every billing
-  bucket (uncached input, cache read, cache write, output) and the cache-hit
-  share.
+
+Session tokens are left to the shipped `usage` stat pill in the same dock: it
+already totals the durable `tokenUsage` projection and lists every billing
+bucket, so this package does not duplicate it.
 
 ### The API key stays in the Host
 

@@ -14,6 +14,7 @@ window.__ModuleLoader__.load({
   id: '@local/deepseek-peak',
   factory(require) {
     const React = require('react')
+    const { Tooltip } = require('@deepseek-ai/dsh-client-ui-primitives')
     const h = React.createElement
 
     /** Locale namespace owned by this bundle. */
@@ -119,7 +120,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a positive duration for the chip label and tooltip.
+     * Format a positive duration for the chip label and banner.
      * @param ms - remaining milliseconds.
      * @param t - namespace translate function.
      * @returns a short duration: `45分`, `1時間23分`, `2日3時間`.
@@ -134,7 +135,7 @@ window.__ModuleLoader__.load({
       return t('duration.minutes', { minutes: String(minutes) })
     }
 
-    /** Local wall-clock time of a UTC instant, for the tooltip. */
+    /** Local wall-clock time of a UTC instant, for the banner. */
     function localClock(at) {
       try {
         return new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -169,12 +170,17 @@ window.__ModuleLoader__.load({
         `${t('peak.next')}: ${t(state.peak ? 'peak.nextToOffPeak' : 'peak.nextToPeak')} — ${t('peak.remaining', { remaining })}`
           + ` (${t('peak.localClock', { time: localClock(state.nextAt) })})`,
       ].join('\n')
-      return h('span', {
+      return h(Tooltip, {
+        label: title,
+        side: 'top',
+        portal: true,
+        openOnClick: true,
+        delayMs: 200,
+      }, h('span', {
         className: 'dp-chip',
         'data-tone': state.peak ? 'peak' : 'offPeak',
         'data-deepseek-peak': state.peak ? 'peak' : 'off-peak',
-        title,
-      }, h(ClockIcon), h('span', { className: 'dp-label' }, label))
+      }, h(ClockIcon), h('span', { className: 'dp-label' }, label)))
     }
 
     return {
