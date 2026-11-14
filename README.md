@@ -11,9 +11,10 @@ JavaScript: no build step, no dependencies, no install scripts.
 
 Both render as ambient chips in the `conversation.composer.dock` slot, below
 the composer card alongside the shipped stat pills and the live-speed chip.
-Hovering a chip opens the shipped tooltip with the full breakdown (a tap pins it
-on touch screens); neither package shows an app-wide alert. Copy is Japanese and
-English; the chip follows the active DSH language.
+Clicking a chip opens a card above it — a headed panel with the figures, a
+credit bar where one applies, and the full breakdown — rather than an app-wide
+alert or a flat tooltip. Copy is Japanese and English; the chip follows the
+active DSH language.
 
 ## Install
 
@@ -44,8 +45,8 @@ The same installs are available from the agent side through
 One chip:
 
 - **Balance** — remaining included credit and allowance, for example
-  `$50.29/$60.00`. Hovering it adds the purchased credit, the total, the current
-  period, and when the reading was taken. A failed refresh keeps the last
+  `$50.29/$60.00`. Clicking it opens the credit bar plus the purchased credit,
+  the total, the current period, and when the reading was taken. A failed refresh keeps the last
   reading and marks the chip as stale; an unconfigured key shows
   `Ollama 未設定` / `Ollama not set up` instead of a guess.
 
@@ -92,6 +93,9 @@ Cloud, with the time left before it changes:
 
 - `ピーク · 1時間23分` / `Peak · 1h23m` — inside the peak window;
 - `オフピーク · 2日3時間` / `Off-peak · 2d 3h` — outside it.
+
+Clicking it opens a card with the current side, the published window, the next
+change, and that change in the reader's local time.
 
 The window is the published Ollama Cloud off-peak schedule: peak billing is
 weekdays 12:00–18:00 UTC, and every other hour — the whole UTC weekend included
