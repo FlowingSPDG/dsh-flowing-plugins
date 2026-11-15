@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Ollama Cloud Off-Peak Status",
-    "description": "Shows whether Ollama Cloud's DeepSeek models (DeepSeek-V4.1-Flash and DeepSeek-V4-Pro) currently bill at the peak or off-peak rate, with the time left on that side of the boundary. Peak runs 12:00–18:00 UTC on weekdays."
+    "description": "Shows whether Ollama Cloud currently bills at the peak or off-peak rate, with the time left on that side of the boundary. Peak runs 12:00–18:00 UTC on weekdays."
   }
 }

@@ -20,9 +20,6 @@ window.__ModuleLoader__.load({
     /** Locale namespace owned by this bundle. */
     const NS = 'deepseekPeak'
 
-    /** The model whose published window this chip reports. */
-    const MODEL = 'DeepSeek-V4.1-Flash'
-
     /** Published peak window (UTC minutes): weekdays 12:00 inclusive to 18:00 exclusive. */
     const PEAK_START_MINUTES = 12 * 60
     const PEAK_END_MINUTES = 18 * 60
@@ -33,7 +30,7 @@ window.__ModuleLoader__.load({
     const ja = {
       'peak.label': 'ピーク · {remaining}',
       'offPeak.label': 'オフピーク · {remaining}',
-      'peak.title': 'Ollama Cloud · {model} の料金時間',
+      'peak.title': 'Ollama Cloud オフピーク時間',
       'peak.now': '現在',
       'peak.state.peak': 'ピークタイム',
       'peak.state.offPeak': 'オフピークタイム',
@@ -53,7 +50,7 @@ window.__ModuleLoader__.load({
     const en = {
       'peak.label': 'Peak · {remaining}',
       'offPeak.label': 'Off-peak · {remaining}',
-      'peak.title': 'Ollama Cloud · {model} billing window',
+      'peak.title': 'Ollama Cloud off-peak hours',
       'peak.now': 'Now',
       'peak.state.peak': 'Peak time',
       'peak.state.offPeak': 'Off-peak time',
@@ -259,7 +256,7 @@ window.__ModuleLoader__.load({
       const state = peakState(now)
       const remaining = formatRemaining(state.remainingMs, t)
       const label = t(state.peak ? 'peak.label' : 'offPeak.label', { remaining })
-      const headline = t('peak.title', { model: MODEL })
+      const headline = t('peak.title')
       const rows = [
         [t('peak.now'), t(state.peak ? 'peak.state.peak' : 'peak.state.offPeak')],
         [t('peak.window'), t('peak.windowValue')],
