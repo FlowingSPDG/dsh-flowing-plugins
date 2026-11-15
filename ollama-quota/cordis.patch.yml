@@ -8,3 +8,7 @@
         apiKeyEnv: OLLAMA_CLOUD_API_KEY
         baseUrl: https://ollama.com
         refreshSeconds: 60
+        # Route id whose calls count toward this balance. Session usage is
+        # attributed per request/header and compaction summary, so mixing other
+        # providers in one Session does not charge their tokens here.
+        provider: ollama-cloud

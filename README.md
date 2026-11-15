@@ -6,7 +6,7 @@ JavaScript: no build step, no dependencies, no install scripts.
 
 | Package | What it shows |
 |---|---|
-| [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit. |
+| [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit and this Session’s estimated Ollama spend. |
 | [`deepseek-peak/`](deepseek-peak) | Whether DeepSeek-V4.1-Flash currently bills at the peak or off-peak rate, and the time left on it. |
 
 Both render as ambient chips in the `conversation.composer.dock` slot, below
@@ -49,10 +49,24 @@ One chip:
   the total, the current period, and when the reading was taken. A failed refresh keeps the last
   reading and marks the chip as stale; an unconfigured key shows
   `Ollama 未設定` / `Ollama not set up` instead of a guess.
+- **Session spend** — the open panel also reports this Session's Ollama-only
+  request count, token buckets, models, and an estimated USD spend. The
+  estimate uses Ollama's published per-token list prices, including the
+  DeepSeek peak/off-peak windows at each record's timestamp. It reads the
+  durable Session log, so usage from before a context compaction is included,
+  and model switches inside one Session are counted per model.
 
-Session tokens are left to the shipped `usage` stat pill in the same dock: it
-already totals the durable `tokenUsage` projection and lists every billing
-bucket, so this package does not duplicate it.
+The panel stays open while the agent streams a reply or appends tool logs; it
+closes on Escape or an outside press, not on transcript scrolling. While it is
+open, Session usage refreshes every 10 seconds.
+
+The shipped `usage` stat pill still owns the all-provider totals. This panel is
+deliberately narrower: it answers "how much of my Ollama Cloud credit did this
+Session consume?" rather than duplicating the whole-session token pill. Other
+providers are shown separately and never folded into the Ollama spend. A
+subagent's usage is added in a labelled subtree row when that child Session is
+live; title-generation calls are counted as requests but cannot be priced
+because their tokens are not logged.
 
 ### The API key stays in the Host
 
@@ -65,8 +79,16 @@ the page over an exact `GET api/ollama-quota/balance` route registered through
 carrier, so the page's own browser-session cookie is the only credential the
 browser presents.
 
-The endpoint allows 10 requests per minute per user, so the Host cache floor is
-60 seconds no matter what the configuration says.
+Session usage travels over a second exact route,
+`GET api/ollama-quota/session?sessionId=…`. A host-only Session projection
+folds the durable events (`request/header`, `assistant/message`,
+`assistant/attempt`, `compaction/summary`, `subagent/catalog`) once per new
+event and the route returns its attributed totals; the browser never folds
+events itself. Fork-inherited history is not counted again:
+only events owned by the Session contribute, so a fork cannot double-charge the
+source conversation. The balance endpoint allows 10 requests per minute per
+user, so the Host cache floor is 60 seconds no matter what the configuration
+says.
 
 ### Configuration
 
@@ -80,7 +102,15 @@ restate the keys you keep):
     apiKeyEnv: OLLAMA_CLOUD_API_KEY   # credential reference (environment-variable name)
     baseUrl: https://ollama.com       # balance endpoint base
     refreshSeconds: 60                # Host cache window; minimum 60
+    provider: ollama-cloud            # provider id whose calls count toward the balance
+    # prices:                         # optional overrides/additions, USD per million tokens
+    #   my-new-model: { input: 0.30, cached: 0.006, output: 1.20 }
 ```
+
+The built-in price table mirrors `https://ollama.com/pricing` and includes a
+peak/off-peak pair for `deepseek-v4.1-flash` and `deepseek-v4-pro`. If Ollama
+changes a price or adds a model, override that row in your profile rather than
+editing the package.
 
 Set the key once, either through the DSH credential store (the Models settings
 page writes provider keys there) or as `OLLAMA_CLOUD_API_KEY` in the

@@ -4,8 +4,9 @@
  * Renders one entry in the composer's dock, beside the context meter. It shows
  * the remaining Ollama Cloud credit, read from this package's Host half over
  * its private Connection RPC channel (the API key never reaches the browser).
- * A click opens a card above the chip with the credit bar and the full
- * breakdown. Session tokens are left to the shipped `usage` pill. The only
+ * A click opens a card above the chip with the credit bar, the full breakdown,
+ * and this Session's Ollama-only usage. The open card deliberately survives
+ * transcript scrolling while the agent streams replies and tool logs. The only
  * styles are this module's own inserted stylesheet.
  *
  * @module @local/ollama-quota/client
@@ -28,8 +29,17 @@ window.__ModuleLoader__.load({
      */
     const ROUTE = 'api/ollama-quota/balance'
 
+    /** Exact route the Host half answers for one Session's attributed usage. */
+    const SESSION_ROUTE = 'api/ollama-quota/session'
+
     /** How often a mounted chip asks for a fresh reading; the Host cache is shared. */
     const POLL_MS = 60_000
+
+    /** How often an open panel re-reads the Session while the agent is working. */
+    const SESSION_POLL_MS = 10_000
+
+    /** A stalled Host read must not freeze the panel's refresh loop. */
+    const CLIENT_REQUEST_TIMEOUT_MS = 15_000
 
     const ja = {
       'balance.loading': 'Ollama 読み込み中',
@@ -50,6 +60,30 @@ window.__ModuleLoader__.load({
       'balance.weekly': '週次残り',
       'balance.updated': '取得時刻',
       'balance.retryAfter': '{seconds} 秒後に再試行してください。',
+      'session.title': 'このセッション',
+      'session.loading': 'セッション消費を読み込み中…',
+      'session.missing': 'このセッションの利用情報を取得できませんでした。',
+      'session.unavailable': 'セッションが選択されていないため利用情報を表示できません。',
+      'session.error': 'セッション消費を取得できませんでした。',
+      'session.empty': 'このセッションではまだ Ollama Cloud を利用していません。',
+      'session.spend': '推定消費',
+      'session.requests': 'リクエスト',
+      'session.requestsWithCompaction': '{requests} 回（圧縮 {compaction} 回）',
+      'session.tokens': 'トークン',
+      'session.tokenSplit': '入力 {input} / 出力 {output}',
+      'session.cache': 'キャッシュ',
+      'session.models': 'モデル',
+      'session.subtree': '合計（サブエージェント込み）',
+      'session.subtreeValue': '{sessions} 件 · {spend}',
+      'session.other': '他LLM利用',
+      'session.otherValue': '{requests} 回 · {tokens}',
+      'session.note': 'Ollama の公表単価による概算です。コンテキスト圧縮前の利用を含み、他LLMとタイトル生成は推定消費に含みません。',
+      'session.unpriced': '単価が不明なモデルの利用は推定に含まれていません。',
+      'session.titleNote': 'タイトル生成 {count} 回はトークンがログに残らないため、推定に含まれません。',
+      'session.subagentMissing': '未読込・終了済みのサブエージェント {count} 件は含まれていません。',
+      'session.updated': '計測時刻',
+      'session.stale': '更新に失敗しました（{time} 時点の値）',
+      'session.forkNote': 'フォーク元から引き継いだ利用は含みません。',
     }
 
     const en = {
@@ -71,6 +105,30 @@ window.__ModuleLoader__.load({
       'balance.weekly': 'Week left',
       'balance.updated': 'Read at',
       'balance.retryAfter': 'Try again in {seconds} seconds.',
+      'session.title': 'This session',
+      'session.loading': 'Loading session spend…',
+      'session.missing': 'Could not read this session’s usage.',
+      'session.unavailable': 'Select a session to see its usage.',
+      'session.error': 'Could not read session spend.',
+      'session.empty': 'This session has not used Ollama Cloud yet.',
+      'session.spend': 'Estimated spend',
+      'session.requests': 'Requests',
+      'session.requestsWithCompaction': '{requests} ({compaction} compaction)',
+      'session.tokens': 'Tokens',
+      'session.tokenSplit': 'in {input} / out {output}',
+      'session.cache': 'Cached',
+      'session.models': 'Models',
+      'session.subtree': 'Total (with subagents)',
+      'session.subtreeValue': '{sessions} sessions · {spend}',
+      'session.other': 'Other LLM use',
+      'session.otherValue': '{requests} calls · {tokens}',
+      'session.note': 'Estimated from Ollama’s published list prices. Includes pre-compaction usage; other LLMs and title generation are excluded.',
+      'session.unpriced': 'Usage of models without a known list price is excluded from the estimate.',
+      'session.titleNote': '{count} title-generation call(s) are excluded because their tokens are not logged.',
+      'session.updated': 'Measured at',
+      'session.stale': 'Refresh failed; showing the {time} reading.',
+      'session.forkNote': 'Usage inherited from the fork source is excluded.',
+      'session.subagentMissing': '{count} subagent session(s) were not loaded or have ended and are excluded.',
     }
 
     const CSS = `
@@ -141,6 +199,9 @@ window.__ModuleLoader__.load({
 .oq-rows dt, .oq-rows dd { min-width: 0; margin: 0; }
 .oq-rows dd { color: var(--dsw-alias-label-secondary); text-align: right; font-variant-numeric: tabular-nums; }
 .oq-note { margin: 8px 0 0; color: var(--dsw-alias-label-tertiary); }
+.oq-session { margin-top: 12px; padding-top: 10px; border-top: 0.5px solid var(--dsw-alias-border-l2); }
+.oq-session-head { display: flex; align-items: baseline; gap: 6px; color: var(--dsw-alias-label-primary); font-weight: 500; }
+.oq-rows-plain { margin-top: 6px; padding-top: 0; border-top: 0; }
 `
 
     /** Coerce to a finite number, or 0. */
@@ -160,6 +221,40 @@ window.__ModuleLoader__.load({
         }).format(amount)
       } catch {
         return `$${amount.toFixed(2)}`
+      }
+    }
+
+    /** Token count in compact notation, with a plain fallback. */
+    function formatTokens(value) {
+      const amount = num(value)
+      try {
+        return new Intl.NumberFormat(undefined, {
+          notation: 'compact',
+          maximumFractionDigits: 1,
+        }).format(amount)
+      } catch {
+        if (amount < 1_000) return String(Math.round(amount))
+        if (amount < 1_000_000) return `${(amount / 1_000).toFixed(amount < 10_000 ? 1 : 0)}K`
+        return `${(amount / 1_000_000).toFixed(1)}M`
+      }
+    }
+
+    /**
+     * USD with enough precision for a single session: cents above one dollar,
+     * four decimals for smaller amounts so a short chat does not read $0.00.
+     */
+    function usdCost(value) {
+      const amount = num(value)
+      const digits = amount >= 1 ? 2 : 4
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits,
+        }).format(amount)
+      } catch {
+        return `$${amount.toFixed(digits)}`
       }
     }
 
@@ -267,6 +362,111 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /**
+     * Fold the Host's attributed Session usage into panel rows.
+     *
+     * The direct figures cover this Session's own log, including records written
+     * before a context compaction; the subtree figures add live subagent
+     * Sessions. Other providers are listed separately and never folded into the
+     * Ollama spend.
+     *
+     * @param snapshot - the Host half's session answer.
+     * @param t - namespace translate function.
+     * @returns state, rows, and explanatory notes.
+     */
+    function describeSession(snapshot, t) {
+      if (snapshot === null) {
+        return { state: 'loading', rows: [], notes: [t('session.loading')] }
+      }
+      if (snapshot.state === 'missing') {
+        return { state: 'missing', rows: [], notes: [t('session.missing')] }
+      }
+      if (snapshot.state !== 'ok' || snapshot.direct === null || typeof snapshot.direct !== 'object') {
+        return { state: 'error', rows: [], notes: [t('session.error')] }
+      }
+
+      const direct = snapshot.direct
+      const subtree = snapshot.subtree !== null && typeof snapshot.subtree === 'object'
+        ? snapshot.subtree
+        : direct
+      const used = num(direct.requests) + num(direct.compactionRequests)
+      const otherCalls = num(subtree.otherRequests) + num(subtree.otherCompactionRequests)
+      const titleCalls = num(subtree.titleRequests)
+      if (used === 0 && otherCalls === 0 && titleCalls === 0) {
+        return { state: 'empty', rows: [], notes: [t('session.empty')] }
+      }
+
+      const rows = []
+      const spend = used > 0 && typeof direct.estimatedUsd === 'number'
+        ? `~${usdCost(direct.estimatedUsd)}`
+        : '—'
+      rows.push([t('session.spend'), spend])
+      rows.push([
+        t('session.requests'),
+        num(direct.compactionRequests) > 0
+          ? t('session.requestsWithCompaction', {
+            requests: String(num(direct.requests)),
+            compaction: String(num(direct.compactionRequests)),
+          })
+          : String(num(direct.requests)),
+      ])
+      rows.push([
+        t('session.tokens'),
+        t('session.tokenSplit', {
+          input: formatTokens(direct.inputTokens),
+          output: formatTokens(direct.outputTokens),
+        }),
+      ])
+      const cached = num(direct.cacheReadTokens) + num(direct.cacheWriteTokens)
+      if (cached > 0) rows.push([t('session.cache'), formatTokens(cached)])
+
+      const models = Array.isArray(direct.models)
+        ? [...new Set(direct.models.map(model => model?.model).filter(model => typeof model === 'string' && model !== 'unknown'))]
+        : []
+      if (models.length > 0) {
+        const shown = models.slice(0, 3)
+        const suffix = models.length > shown.length ? ` +${String(models.length - shown.length)}` : ''
+        rows.push([t('session.models'), `${shown.join(', ')}${suffix}`])
+      }
+
+      if (num(subtree.subagentSessions) > 0) {
+        rows.push([
+          t('session.subtree'),
+          t('session.subtreeValue', {
+            sessions: String(num(subtree.subagentSessions)),
+            spend: typeof subtree.estimatedUsd === 'number' ? `~${usdCost(subtree.estimatedUsd)}` : '—',
+          }),
+        ])
+      }
+      if (otherCalls > 0) {
+        rows.push([
+          t('session.other'),
+          t('session.otherValue', {
+            requests: String(otherCalls),
+            tokens: formatTokens(subtree.otherTokens),
+          }),
+        ])
+      }
+      if (Number.isFinite(snapshot.generatedAt)) {
+        rows.push([t('session.updated'), clockTime(snapshot.generatedAt)])
+      }
+
+      const notes = [t('session.note')]
+      if (snapshot.stale === true) {
+        const at = Number.isFinite(snapshot.generatedAt) ? clockTime(snapshot.generatedAt) : '—'
+        notes.unshift(t('session.stale', { time: at }))
+      }
+      if (snapshot.forked === true || num(snapshot.inheritedEventCount) > 0) {
+        notes.push(t('session.forkNote'))
+      }
+      if (num(subtree.unpricedRequests) > 0) notes.push(t('session.unpriced'))
+      if (titleCalls > 0) notes.push(t('session.titleNote', { count: String(titleCalls) }))
+      if (num(subtree.missingSessions) > 0) {
+        notes.push(t('session.subagentMissing', { count: String(num(subtree.missingSessions)) }))
+      }
+      return { state: 'ok', rows, notes }
+    }
+
     /** A coin glyph, drawn from the current text color. */
     function CoinIcon() {
       return h('svg', { viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
@@ -313,8 +513,52 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The chip's open state plus the placement measured when it opens. The panel
-     * anchors above the chip and closes on Escape, an outside press, or a scroll.
+     * Read the current Session's attributed usage while the panel is open.
+     * Polling covers live turns, tool logs, model switches, and compaction
+     * without making the panel depend on any one transcript event.
+     * @param readUsage - injected host reader.
+     * @param sessionId - the mounted Session identity.
+     * @param active - whether the panel is open.
+     * @returns the latest host snapshot, or null before the first read.
+     */
+    function useSessionUsage(readUsage, sessionId, active) {
+      const [snapshot, setSnapshot] = React.useState(null)
+      React.useEffect(() => {
+        if (!active || typeof readUsage !== 'function' || typeof sessionId !== 'string' || sessionId === '') {
+          setSnapshot(null)
+          return
+        }
+        let cancelled = false
+        let timer = null
+        const poll = () => {
+          Promise.resolve()
+            .then(() => readUsage(sessionId))
+            .then((next) => { if (!cancelled) setSnapshot(next) })
+            .catch((error) => {
+              if (cancelled) return
+              const message = String(error && error.message ? error.message : error)
+              setSnapshot(previous => previous !== null && previous.state === 'ok'
+                ? { ...previous, stale: true }
+                : { state: 'error', direct: null, error: { message } })
+            })
+            .then(() => {
+              if (!cancelled) timer = setTimeout(poll, SESSION_POLL_MS)
+            })
+        }
+        poll()
+        return () => {
+          cancelled = true
+          if (timer !== null) clearTimeout(timer)
+        }
+      }, [active, readUsage, sessionId])
+      return snapshot
+    }
+
+    /**
+     * The chip's open state plus its placement. The panel anchors above the chip
+     * and closes on Escape or an outside press. It deliberately does not close
+     * on scroll: agent replies and tool logs scroll the transcript while the
+     * user is reading the panel, and that must not dismiss it.
      */
     function usePanel() {
       const anchorRef = React.useRef(null)
@@ -322,54 +566,103 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = React.useState(false)
       const [placement, setPlacement] = React.useState(null)
 
-      const toggle = React.useCallback(() => {
-        setOpen((wasOpen) => {
-          if (wasOpen) return false
-          const rect = anchorRef.current?.getBoundingClientRect()
-          if (rect === undefined) return false
-          const width = Math.min(300, window.innerWidth - 24)
-          const centered = rect.left + rect.width / 2 - width / 2
-          const left = Math.min(Math.max(12, centered), Math.max(12, window.innerWidth - width - 12))
-          setPlacement({
-            left,
-            width,
-            bottom: window.innerHeight - rect.top + 8,
-            maxHeight: Math.max(160, rect.top - 20),
-          })
-          return true
+      /** Re-anchor the fixed panel above the chip after a layout change. */
+      const measure = React.useCallback(() => {
+        const rect = anchorRef.current?.getBoundingClientRect()
+        if (rect === undefined) return
+        const width = Math.min(300, window.innerWidth - 24)
+        const centered = rect.left + rect.width / 2 - width / 2
+        const left = Math.min(Math.max(12, centered), Math.max(12, window.innerWidth - width - 12))
+        setPlacement({
+          left,
+          width,
+          bottom: window.innerHeight - rect.top + 8,
+          maxHeight: Math.max(160, rect.top - 20),
         })
+      }, [])
+
+      const toggle = React.useCallback(() => {
+        setOpen(wasOpen => !wasOpen)
       }, [])
 
       React.useEffect(() => {
         if (!open) return
+        measure()
         const onPointer = (event) => {
           if (panelRef.current?.contains(event.target)) return
           if (anchorRef.current?.contains(event.target)) return
           setOpen(false)
         }
-        const onKey = (event) => { if (event.key === 'Escape') setOpen(false) }
-        const onViewport = () => { setOpen(false) }
+        const onKey = (event) => {
+          if (event.key !== 'Escape') return
+          // Consume the key before DSH's shortcut dispatcher can arm Esc-Esc
+          // "stop turn"; closing the panel is the whole intended action.
+          event.preventDefault()
+          event.stopPropagation()
+          setOpen(false)
+        }
+        const onLayout = () => { measure() }
         document.addEventListener('pointerdown', onPointer, true)
-        document.addEventListener('keydown', onKey)
-        window.addEventListener('resize', onViewport)
-        window.addEventListener('scroll', onViewport, true)
+        document.addEventListener('keydown', onKey, true)
+        window.addEventListener('resize', onLayout)
+        window.visualViewport?.addEventListener('resize', onLayout)
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(onLayout) : null
+        const anchor = anchorRef.current
+        if (observer !== null && anchor !== null) {
+          const observed = new Set([
+            anchor,
+            anchor.parentElement,
+            anchor.closest('[data-composer-card]'),
+            anchor.closest('[data-composer-dock]'),
+          ])
+          for (const element of observed) {
+            if (element !== null) observer.observe(element)
+          }
+        }
         return () => {
           document.removeEventListener('pointerdown', onPointer, true)
-          document.removeEventListener('keydown', onKey)
-          window.removeEventListener('resize', onViewport)
-          window.removeEventListener('scroll', onViewport, true)
+          document.removeEventListener('keydown', onKey, true)
+          window.removeEventListener('resize', onLayout)
+          window.visualViewport?.removeEventListener('resize', onLayout)
+          observer?.disconnect()
         }
+      }, [measure, open])
+
+      // Re-opening must never flash the previous anchor position.
+      React.useEffect(() => {
+        if (!open) setPlacement(null)
       }, [open])
 
       return { open, placement, toggle, anchorRef, panelRef }
     }
 
+    /** The panel's session block: attributed spend, tokens, and scope notes. */
+    function SessionSection({ view, t }) {
+      return h('section', { className: 'oq-session', 'data-ollama-session': view.state },
+        h('div', { className: 'oq-session-head' },
+          h('span', { className: 'oq-panel-title' }, t('session.title'))),
+        view.rows.length > 0 ? h('dl', { className: 'oq-rows oq-rows-plain' },
+          view.rows.flatMap((row, index) => [
+            h('dt', { key: `session-label-${String(index)}` }, row[0]),
+            h('dd', { key: `session-value-${String(index)}` }, row[1]),
+          ])) : null,
+        view.notes.map((note, index) => h('p', {
+          key: `session-note-${String(index)}`,
+          className: 'oq-note',
+        }, note)),
+      )
+    }
+
     /** Remaining Ollama Cloud credit, ambient on the composer's stats row. */
     function BalanceChip(props) {
-      const { t, readBalance } = props
+      const { t, readBalance, readSessionUsage, sessionId } = props
       const snapshot = useBalance(readBalance)
       const view = describeBalance(snapshot, t)
       const panel = usePanel()
+      const session = useSessionUsage(readSessionUsage, sessionId, panel.open)
+      const sessionView = typeof sessionId === 'string' && sessionId !== ''
+        ? describeSession(session, t)
+        : { state: 'unavailable', rows: [], notes: [t('session.unavailable')] }
       return h(React.Fragment, null,
         h('button', {
           type: 'button',
@@ -406,6 +699,7 @@ window.__ModuleLoader__.load({
                 h('dd', { key: `value-${String(index)}` }, row[1]),
               ])) : null,
             view.note !== null ? h('p', { className: 'oq-note' }, view.note) : null,
+            h(SessionSection, { view: sessionView, t }),
           ),
           document.body,
         ) : null,
@@ -446,7 +740,29 @@ window.__ModuleLoader__.load({
           return snapshot
         }
 
-        const injected = () => ({ readBalance })
+        /**
+         * Read one Session's attributed usage from this bundle's Host half.
+         * The route reads the durable log, so it also sees usage from before a
+         * context compaction and from a model that is no longer selected.
+         * @param sessionId - mounted Session identity.
+         * @returns the session usage snapshot.
+         */
+        const readSessionUsage = async (sessionId) => {
+          const url = `${SESSION_ROUTE}?sessionId=${encodeURIComponent(sessionId)}`
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: { accept: 'application/json' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+            signal: AbortSignal.timeout(CLIENT_REQUEST_TIMEOUT_MS),
+          })
+          if (!response.ok) throw new Error(`session route answered HTTP ${String(response.status)}`)
+          const snapshot = await response.json()
+          if (snapshot === null || typeof snapshot !== 'object') throw new Error('session route answered no snapshot')
+          return snapshot
+        }
+
+        const injected = () => ({ readBalance, readSessionUsage })
 
         ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
           name: 'conversation.composer.dock',
