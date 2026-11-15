@@ -33,12 +33,12 @@ window.__ModuleLoader__.load({
     const ja = {
       'peak.label': 'ピーク · {remaining}',
       'offPeak.label': 'オフピーク · {remaining}',
-      'peak.title': '{model} の料金時間',
+      'peak.title': 'Ollama Cloud · {model} の料金時間',
       'peak.now': '現在',
       'peak.state.peak': 'ピークタイム',
       'peak.state.offPeak': 'オフピークタイム',
       'peak.window': 'ピーク時間',
-      'peak.windowValue': '月〜金 12:00–18:00 UTC（土日は終日オフピーク）',
+      'peak.windowValue': '月〜金 12:00–18:00 UTC（UTC の週末は終日オフピーク）',
       'peak.next': '次の切替',
       'peak.nextToOffPeak': '18:00 UTC にオフピークへ',
       'peak.nextToPeak': '12:00 UTC にピークへ',
@@ -53,7 +53,7 @@ window.__ModuleLoader__.load({
     const en = {
       'peak.label': 'Peak · {remaining}',
       'offPeak.label': 'Off-peak · {remaining}',
-      'peak.title': '{model} billing window',
+      'peak.title': 'Ollama Cloud · {model} billing window',
       'peak.now': 'Now',
       'peak.state.peak': 'Peak time',
       'peak.state.offPeak': 'Off-peak time',
