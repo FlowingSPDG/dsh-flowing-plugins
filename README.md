@@ -7,7 +7,7 @@ JavaScript: no build step, no dependencies, no install scripts.
 | Package | What it shows |
 |---|---|
 | [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit and this Session’s estimated Ollama spend. |
-| [`deepseek-peak/`](deepseek-peak) | Whether DeepSeek-V4.1-Flash currently bills at the peak or off-peak rate, and the time left on it. |
+| [`ollama-offpeak/`](ollama-offpeak) | Whether Ollama Cloud currently bills at the peak or off-peak rate, and the time left on it. |
 
 Both render as ambient chips in the `conversation.composer.dock` slot, below
 the composer card alongside the shipped stat pills and the live-speed chip.
@@ -23,7 +23,7 @@ the profile you use.
 
 ```sh
 dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/ollama-quota
-dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/deepseek-peak
+dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/ollama-offpeak
 ```
 
 Both packages ship plain JavaScript, so a git install needs no build allowance
@@ -52,7 +52,7 @@ One chip:
 - **Session spend** — the open panel also reports this Session's Ollama-only
   request count, token buckets, models, and an estimated USD spend. The
   estimate uses Ollama's published per-token list prices, including the
-  DeepSeek peak/off-peak windows at each record's timestamp. It reads the
+  peak/off-peak rows at each record's timestamp. It reads the
   durable Session log, so usage from before a context compaction is included,
   and model switches inside one Session are counted per model.
 
@@ -116,10 +116,10 @@ Set the key once, either through the DSH credential store (the Models settings
 page writes provider keys there) or as `OLLAMA_CLOUD_API_KEY` in the
 environment that launches `dsh`.
 
-## `deepseek-peak`
+## `ollama-offpeak`
 
-One chip naming the current billing side of DeepSeek-V4.1-Flash on Ollama
-Cloud, with the time left before it changes:
+One chip naming whether Ollama Cloud bills at the peak or off-peak rate right
+now, with the time left before it changes:
 
 - `ピーク · 1時間23分` / `Peak · 1h23m` — inside the peak window;
 - `オフピーク · 2日3時間` / `Off-peak · 2d 3h` — outside it.
@@ -135,7 +135,7 @@ minute and needs no network and no configuration.
 
 > This chip reports the clock, not your provider's live pricing. If Ollama
 > Cloud changes its peak schedule, update `PEAK_START_MINUTES` /
-> `PEAK_END_MINUTES` in [`deepseek-peak/client.js`](deepseek-peak/client.js).
+> `PEAK_END_MINUTES` in [`ollama-offpeak/client.js`](ollama-offpeak/client.js).
 
 ## Package layout
 

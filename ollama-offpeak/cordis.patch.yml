@@ -1,0 +1,3 @@
+- insert:
+    - id: ollama-offpeak
+      name: '@local/ollama-offpeak'

@@ -1,24 +1,24 @@
 /**
- * Browser half of the DeepSeek peak-status chip.
+ * Browser half of the Ollama Cloud off-peak chip.
  *
- * DeepSeek-V4.1-Flash on Ollama Cloud publishes an off-peak rate: peak billing
+ * Ollama Cloud publishes an off-peak rate for its DeepSeek models: peak billing
  * is weekdays 12:00–18:00 UTC, and every other hour — including the whole UTC
  * weekend — bills at the off-peak rate. The chip reads the UTC wall clock and
  * names the current side of that boundary plus the time left on it, so a user
  * can tell at a glance whether a request right now bills at peak.
  *
- * @module @local/deepseek-peak/client
+ * @module @local/ollama-offpeak/client
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/deepseek-peak',
+  id: '@local/ollama-offpeak',
   factory(require) {
     const React = require('react')
     const { createPortal } = require('react-dom')
     const h = React.createElement
 
     /** Locale namespace owned by this bundle. */
-    const NS = 'deepseekPeak'
+    const NS = 'ollamaOffpeak'
 
     /** Published peak window (UTC minutes): weekdays 12:00 inclusive to 18:00 exclusive. */
     const PEAK_START_MINUTES = 12 * 60
@@ -245,7 +245,7 @@ window.__ModuleLoader__.load({
       return { open, placement, toggle, anchorRef, panelRef }
     }
 
-    /** Peak or off-peak for DeepSeek-V4.1-Flash on Ollama Cloud, on the stats row. */
+    /** Peak or off-peak for Ollama Cloud, on the composer dock. */
     function PeakChip(props) {
       const { t } = props
       const [now, setNow] = React.useState(() => Date.now())
@@ -270,7 +270,7 @@ window.__ModuleLoader__.load({
           ref: panel.anchorRef,
           className: 'dp-chip',
           'data-tone': state.peak ? 'peak' : 'offPeak',
-          'data-deepseek-peak': state.peak ? 'peak' : 'off-peak',
+          'data-ollama-offpeak': state.peak ? 'peak' : 'off-peak',
           'aria-haspopup': 'dialog',
           'aria-expanded': panel.open,
           onClick: panel.toggle,
@@ -308,17 +308,17 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctx.effect(() => {
           const style = document.createElement('style')
-          style.dataset.dshPlugin = '@local/deepseek-peak'
+          style.dataset.dshPlugin = '@local/ollama-offpeak'
           style.textContent = CSS
           document.head.appendChild(style)
           return () => { style.remove() }
-        }, 'deepseek-peak: chip styles')
+        }, 'ollama-offpeak: chip styles')
 
-        ctx.effect(() => ctx.locale.register(NS, { ja, en }), 'deepseek-peak: dictionaries')
+        ctx.effect(() => ctx.locale.register(NS, { ja, en }), 'ollama-offpeak: dictionaries')
 
         ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
           name: 'conversation.composer.dock',
-          id: 'deepseek-peak',
+          id: 'ollama-offpeak',
           order: 40,
           locale: NS,
         }, PeakChip))

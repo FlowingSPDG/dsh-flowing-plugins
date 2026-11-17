@@ -1,6 +1,6 @@
 {
-  "name": "@local/deepseek-peak",
-  "version": "1.0.0",
+  "name": "@local/ollama-offpeak",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "exports": {
