@@ -9,6 +9,7 @@ JavaScript: no build step, no dependencies, no install scripts.
 | [`ollama-quota/`](ollama-quota) | Remaining Ollama Cloud credit and this Session’s estimated Ollama spend. |
 | [`ollama-offpeak/`](ollama-offpeak) | Whether Ollama Cloud currently bills at the peak or off-peak rate, and the time left on it. |
 | [`opencode-go-quota/`](opencode-go-quota) | OpenCode Go usage (5-hour / weekly / monthly), this Session’s estimated allowance spend, and a limited-time free-model watch. |
+| [`provider-visibility/`](provider-visibility) | The active provider beside the model in the composer’s model selector, and the provider/model that served each completed chat turn. |
 
 Both render as ambient chips in the `conversation.composer.dock` slot, below
 the composer card alongside the shipped stat pills and the live-speed chip.
@@ -41,6 +42,25 @@ dsh plugin --profile web remove @local/ollama-quota
 
 The same installs are available from the agent side through
 `plugin_manager` (`install_bundle` with the package directory).
+
+## `provider-visibility`
+
+The shipped composer model seat and the chat flow name the model but not the
+channel it runs on. Two shipped-slot contributions fill that in:
+
+- **Model selector** (`conversation.input.model.label`) — the trigger, the
+  root menu's current value, and each option row render
+  `Provider · Model`, with the provider in the quieter label color. The
+  provider truncates first in the narrow trigger, so the model name stays
+  readable. A catalog badge keeps its shipped position (before the name in the
+  trigger, after it in menus) as a neutral pill.
+- **Completed turns** (`conversation.chat.turnTail`) — each finished turn
+  shows quiet chips of the provider/model routes that actually served it, read
+  from the turn's token-usage attribution. A turn without attribution renders
+  nothing.
+
+Both contributions are non-interactive; selection controls stay owned by the
+shipped seat. Install as above and reload the open Harness page once.
 
 ## `ollama-quota`
 

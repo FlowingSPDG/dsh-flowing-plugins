@@ -1,0 +1,3 @@
+- insert:
+    - id: provider-visibility
+      name: '@local/provider-visibility'

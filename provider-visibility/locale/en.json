@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Provider visibility",
+    "description": "Shows the active provider next to the model in the composer's model selector (trigger, menu value, and option rows) and marks each completed chat turn with the provider and model that served it."
+  }
+}
