@@ -42,7 +42,8 @@ dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/ollama-quota
 ```
 
 or paste `github:FlowingSPDG/dsh-flowing-plugins/ollama-quota` into the same
-dialog. All five:
+dialog. The CLI only adds the dependency, so switch the bundle on under
+**Plugins** afterwards; the dialog's **Enable now** does that for you. All five:
 
 ```sh
 for p in provider-visibility model-favorites ollama-quota ollama-offpeak opencode-go-quota; do
