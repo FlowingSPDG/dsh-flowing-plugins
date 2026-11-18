@@ -46,7 +46,7 @@ const MIN_FREE_REFRESH_SECONDS = 300
 const REQUEST_TIMEOUT_MS = 15_000
 
 const DEFAULTS = {
-  apiKeyEnv: 'OPENCODE_API_KEY',
+  apiKeyEnv: 'OPENCODE_GO_API_KEY',
   baseUrl: 'https://opencode.ai',
   refreshSeconds: 60,
   freeRefreshSeconds: 600,

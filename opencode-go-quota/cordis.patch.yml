@@ -5,7 +5,7 @@
         # Credential reference holding the OpenCode Go API key, and how long the
         # Host caches one usage answer. Keep refreshSeconds at 60 or more; the
         # endpoint's own rate limit is undocumented.
-        apiKeyEnv: OPENCODE_API_KEY
+        apiKeyEnv: OPENCODE_GO_API_KEY
         baseUrl: https://opencode.ai
         refreshSeconds: 60
         # How often the Host re-reads the public Go models list for the

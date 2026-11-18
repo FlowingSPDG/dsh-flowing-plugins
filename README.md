@@ -212,7 +212,7 @@ restate the keys you keep):
 ```yaml
 - id: opencode-go-quota
   config:
-    apiKeyEnv: OPENCODE_API_KEY        # credential reference (environment-variable name)
+    apiKeyEnv: OPENCODE_GO_API_KEY        # credential reference (environment-variable name)
     baseUrl: https://opencode.ai       # usage + models endpoint base
     refreshSeconds: 60                 # Host cache window for usage; minimum 60
     freeRefreshSeconds: 600            # free-model watch cadence; minimum 300
@@ -227,7 +227,7 @@ the long-context tiers. If OpenCode changes a price or adds a model, override
 that row in your profile rather than editing the package.
 
 Set the key once, either through the DSH credential store (the Models settings
-page writes provider keys there) or as `OPENCODE_API_KEY` in the environment
+page writes provider keys there) or as `OPENCODE_GO_API_KEY` in the environment
 that launches `dsh`. The free-model watch needs no key and no configuration.
 
 ## Package layout

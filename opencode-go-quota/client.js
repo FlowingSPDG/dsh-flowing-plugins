@@ -349,7 +349,7 @@ window.__ModuleLoader__.load({
           headline: t('usage.titleUnconfigured'),
           tone: 'muted',
           windows: [],
-          notes: [t('usage.envNote', { env: String(snapshot.apiKeyEnv ?? 'OPENCODE_API_KEY') })],
+          notes: [t('usage.envNote', { env: String(snapshot.apiKeyEnv ?? 'OPENCODE_GO_API_KEY') })],
         }
       }
 
