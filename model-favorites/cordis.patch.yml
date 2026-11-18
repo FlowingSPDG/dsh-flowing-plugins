@@ -1,0 +1,3 @@
+- insert:
+    - id: model-favorites
+      name: '@local/model-favorites'

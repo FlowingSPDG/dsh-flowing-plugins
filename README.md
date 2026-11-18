@@ -10,13 +10,16 @@ JavaScript: no build step, no dependencies, no install scripts.
 | [`ollama-offpeak/`](ollama-offpeak) | Whether Ollama Cloud currently bills at the peak or off-peak rate, and the time left on it. |
 | [`opencode-go-quota/`](opencode-go-quota) | OpenCode Go usage (5-hour / weekly / monthly), this Session’s estimated allowance spend, and a limited-time free-model watch. |
 | [`provider-visibility/`](provider-visibility) | The active provider beside the model in the composer’s model selector, and the provider/model that served each completed chat turn. |
+| [`model-favorites/`](model-favorites) | Star models and providers from a ★ chip beside the model selector, then search and pick only your favorites. |
 
-Both render as ambient chips in the `conversation.composer.dock` slot, below
+The three quota chips render in the `conversation.composer.dock` slot, below
 the composer card alongside the shipped stat pills and the live-speed chip.
-Clicking a chip opens a card above it — a headed panel with the figures, a
+Clicking one opens a card above it — a headed panel with the figures, a
 credit bar where one applies, and the full breakdown — rather than an app-wide
-alert or a flat tooltip. Copy is Japanese and English; the chip follows the
-active DSH language.
+alert or a flat tooltip. `provider-visibility` labels the model selector and
+each completed turn in place, and `model-favorites` adds a ★ chip beside the
+model selector. Copy is Japanese and English; every surface follows the active
+DSH language.
 
 ## Install
 
@@ -27,9 +30,11 @@ the profile you use.
 dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/ollama-quota
 dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/ollama-offpeak
 dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/opencode-go-quota
+dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/provider-visibility
+dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/model-favorites
 ```
 
-Both packages ship plain JavaScript, so a git install needs no build allowance
+All packages ship plain JavaScript, so a git install needs no build allowance
 and no `prepare` script. Afterwards, reload the open Harness page once: a page
 that was already open keeps the module graph it booted with, so a newly
 installed browser half appears only after a reload.
@@ -61,6 +66,35 @@ channel it runs on. Two shipped-slot contributions fill that in:
 
 Both contributions are non-interactive; selection controls stay owned by the
 shipped seat. Install as above and reload the open Harness page once.
+
+## `model-favorites`
+
+A ★ chip sits immediately after the composer's model selector
+(`conversation.input.activity`) and opens a panel over the transcript:
+
+- **★ お気に入り / Favorites** — only the starred `provider/model` pairs, plus
+  every model of a starred provider.
+- **すべて / All** — the whole catalog. A row's ☆ adds it, ★ removes it, and the
+  ☆ beside a provider name stars all of that provider's models at once. The
+  panel opens in this mode when nothing is starred yet.
+- **Search** — the field at the top filters models and providers by name as you
+  type; ↑/↓ moves, Enter picks, Escape closes.
+- **Picking a row** switches the session model through the same
+  `session.selectModel` call the native menu uses. A one-row offer at the top
+  stars the model the session is using when it is not starred yet.
+
+The document — `{ providers: string[], models: string[] }`, with model keys as
+`providerId/modelId` — lives on the Host in
+`$DSH_HOME/storages/model-favorites/state.json` and is served over two exact
+routes, `GET` and `POST /model-favorites/state`, below the authenticated `/api`
+carrier. Writes are serialized and land through a temporary file plus rename; a
+page that never read the document never writes it, so a Host that is unreachable
+cannot clear saved favorites with an empty list. Favorites are shared by every
+browser and device on the profile but are not live-synced: another device's
+changes appear on the next panel open or page reload.
+
+The native model menu is left alone — starring rows inside it, or filtering it
+to favorites, would need a core UI replacement, which this package does not do.
 
 ## `ollama-quota`
 
