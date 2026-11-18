@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 
 const require = createRequire(import.meta.url)
@@ -122,6 +122,72 @@ for (const name of PACKAGES) {
   } catch (error) {
     failures += 1
     console.error(`FAIL ${name}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+const HOSTS = [
+  { dir: 'provider-visibility', routes: [] },
+  { dir: 'ollama-offpeak', routes: [] },
+  { dir: 'model-favorites', routes: ['/model-favorites/state'] },
+  {
+    dir: 'ollama-quota',
+    routes: ['/api/ollama-quota/balance', '/api/ollama-quota/session'],
+  },
+  {
+    dir: 'opencode-go-quota',
+    routes: [
+      '/api/opencode-go-quota/usage',
+      '/api/opencode-go-quota/session',
+      '/api/opencode-go-quota/free',
+    ],
+  },
+]
+
+/** A context that records every route the Host half registers. */
+function hostContext(routes) {
+  const record = (options) => {
+    routes.push(options.path)
+    return () => {}
+  }
+  const noopLogger = () => ({ info() {}, warn() {}, error() {}, debug() {} })
+  const ctx = {
+    effect(execute) {
+      const dispose = execute()
+      return typeof dispose === 'function' ? dispose : () => {}
+    },
+    inject(_services, callback) {
+      return callback(ctx)
+    },
+    on: () => () => {},
+    logger: noopLogger,
+    webServer: { register: record },
+    connection: { fetch: { register: record } },
+    sessions: { get: () => undefined },
+    sessionProjections: { register: async () => ({}) },
+  }
+  // `ctx.get(name)` is how a Host half asks for a service it did not inject;
+  // credentials and the launch environment stay absent on purpose.
+  const services = {
+    connection: ctx.connection,
+    sessions: ctx.sessions,
+    sessionProjections: ctx.sessionProjections,
+  }
+  ctx.get = (name) => services[name]
+  return ctx
+}
+
+for (const host of HOSTS) {
+  const path = join(root, host.dir, 'dist', 'index.js')
+  const routes = []
+  try {
+    const module = await import(pathToFileURL(path).href)
+    assert.equal(typeof module.apply, 'function', 'host exports apply')
+    await module.apply(hostContext(routes), {})
+    assert.deepEqual(routes.sort(), [...host.routes].sort(), 'routes registered')
+    console.log(`ok   ${host.dir} host -> ${routes.length} routes`)
+  } catch (error) {
+    failures += 1
+    console.error(`FAIL ${host.dir} host: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
