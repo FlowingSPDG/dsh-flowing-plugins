@@ -1,23 +1,16 @@
 {
   "name": "@local/model-favorites",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Star models and providers, then filter and search only your favorites from the composer",
   "exports": {
-    ".": "./index.js",
-    "./client": "./client.js",
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": [
-    "index.js",
-    "client.js",
-    "cordis.patch.yml",
-    "locale/*.json",
-    "README.md",
-    "icon.svg"
-  ],
+  "files": ["dist", "cordis.patch.yml", "locale/*.json", "README.md", "icon.svg"],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

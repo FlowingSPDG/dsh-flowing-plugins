@@ -1,0 +1,6 @@
+packages:
+  - provider-visibility
+  - ollama-offpeak
+  - ollama-quota
+  - opencode-go-quota
+  - model-favorites

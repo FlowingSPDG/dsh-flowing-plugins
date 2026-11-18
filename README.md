@@ -1,8 +1,9 @@
 # dsh-flowing-plugins
 
 Small [DeepSeek Harness](https://github.com/deepseek-ai) (DSH) Web UI plugins for
-the composer's dock. Each package is self-contained plain
-JavaScript: no build step, no dependencies, no install scripts.
+the composer's dock. Each package is self-contained TypeScript compiled to
+plain JavaScript: no runtime dependencies, no install scripts, and the built
+bundles are committed, so installing one never runs a build.
 
 | Package | What it shows |
 |---|---|
@@ -34,10 +35,10 @@ dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/provider-vis
 dsh plugin --profile web add github:FlowingSPDG/dsh-flowing-plugins/model-favorites
 ```
 
-All packages ship plain JavaScript, so a git install needs no build allowance
-and no `prepare` script. Afterwards, reload the open Harness page once: a page
-that was already open keeps the module graph it booted with, so a newly
-installed browser half appears only after a reload.
+Every package ships its built Host and browser bundles in `dist/`, so a git
+install needs no build allowance and no `prepare` script. Afterwards, reload
+the open Harness page once: a page that was already open keeps the module graph
+it booted with, so a newly installed browser half appears only after a reload.
 
 To remove one:
 
@@ -191,7 +192,7 @@ minute and needs no network and no configuration.
 
 > This chip reports the clock, not your provider's live pricing. If Ollama
 > Cloud changes its peak schedule, update `PEAK_START_MINUTES` /
-> `PEAK_END_MINUTES` in [`ollama-offpeak/client.js`](ollama-offpeak/client.js).
+> `PEAK_END_MINUTES` in [`ollama-offpeak/src/peak.ts`](ollama-offpeak/src/peak.ts).
 
 ## `opencode-go-quota`
 
@@ -308,13 +309,31 @@ file for Plugin Manager's title and description, and an icon:
 
 ```text
 <package>/
-  package.json       manifest: exports, files, dsh.bundle, dsh.client
-  cordis.patch.yml   the Loader row(s) the bundle inserts
-  index.js           Host half (apply(ctx, config))
-  client.js          browser half (__ModuleLoader__.load factory)
+  package.json         manifest: exports, files, dsh.bundle, dsh.client
+  cordis.patch.yml     the Loader row(s) the bundle inserts
+  src/index.ts         Host half source (apply(ctx, config))
+  src/client.tsx       browser half source (slots, locale, styles)
+  src/*.test.ts        node --test cases over the pure helpers
+  dist/index.js        built Host half, committed
+  dist/client.js       built browser bundle in the __ModuleLoader__.load form, committed
   locale/{en,ja}.json  Plugin Manager metadata
-  icon.svg           Plugin Manager artwork
+  icon.svg             Plugin Manager artwork
 ```
+
+Edit `src/`; `dist/` is generated. From a checkout of this repository:
+
+```sh
+pnpm install
+pnpm build      # regenerate every package's dist/
+pnpm typecheck  # tsc over every package
+pnpm test       # node --test over the pure helpers
+pnpm smoke      # load every built bundle the way the page does
+```
+
+The bundles stay committed on purpose: a `dsh plugin add github:…` install
+resolves `dist/` directly and stays free of build scripts. A bundle rebuilt by
+`pnpm build` reaches the open page through DSH's client module rebuild watch;
+a package added or removed still needs the one page reload described above.
 
 The browser halves draw with the host's `--dsw-alias-*` theme tokens only, and
 every resource they add (stylesheet, timers, slot registrations) is removed

@@ -8,5 +8,7 @@
  * @module @local/provider-visibility
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+
 /** Host plugin body — the Client half owns the whole capability. */
-export function apply() {}
+export function apply(_ctx: Context): void {}

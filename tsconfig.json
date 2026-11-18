@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [
+    "*/src/**/*.ts",
+    "*/src/**/*.tsx",
+    "scripts/**/*.mjs"
+  ],
+  "exclude": ["**/node_modules/**", "**/dist/**"]
+}
