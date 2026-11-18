@@ -6,8 +6,9 @@
  * this package's Host half over its private Connection RPC channel (the API
  * key never reaches the browser). A click opens a card above the chip with the
  * three usage bars and their reset times, this Session's estimated Go spend,
- * and the limited-time free models the Host watcher currently sees — new ones
- * since the last look are marked, and opening the panel acknowledges them.
+ * and the limited-time free models the Host watcher currently sees — the
+ * watched models' free windows are called out by name, new arrivals since the
+ * last look are marked, and opening the panel acknowledges them.
  *
  * OpenCode Go's allowance carries no peak-time schedule, but the published
  * token prices of a few models (the DeepSeek rows and, from December 2026,
@@ -57,7 +58,7 @@ window.__ModuleLoader__.load({
       'usage.title': 'OpenCode Go 使用量',
       'usage.titleUnconfigured': 'OpenCode Go の使用量は取得できません',
       'usage.titleError': 'OpenCode Go の使用量を取得できませんでした',
-      'usage.envNote': 'GoのAPIキーを環境変数 {env} に設定すると表示されます。',
+      'usage.envNote': 'GoのAPIキーを {env} （資格情報ストアまたは環境変数）に設定すると表示されます。',
       'usage.rolling': '5時間ウィンドウ',
       'usage.weekly': '週次',
       'usage.monthly': '月次',
@@ -68,11 +69,19 @@ window.__ModuleLoader__.load({
       'free.title': '期間限定フリーモデル',
       'free.checked': '確認時刻',
       'free.count': '{count} 件が無料',
+      'free.badge': '無料',
       'free.new': '新',
       'free.newNote': '前回確認以降に追加されたフリーモデルがあります。この一覧を開くと「新」は解除されます。',
       'free.empty': '現在フリーモデルは見つかりません。',
       'free.error': 'フリーモデル一覧を取得できませんでした。',
       'free.note': 'ホスト側で公開モデル一覧を定期監視しています。フリーモデルはGoの使用量を消費しません。',
+      'free.nowFree': '現在無料',
+      'free.nowPaid': '現在有料（入力 {price} /100万トークン）',
+      'free.nowPaidUnknown': '現在有料（単価未掲載）',
+      'free.historyTitle': '最近の変化',
+      'free.added': '{name} が無料に',
+      'free.removed': '{name} が無料でなくなりました',
+      'free.historyNote': 'フリーモデルの追加・終了はホストの監視で検知し、この履歴はホスト起動以降の分を記録します。',
       'free.loading': 'フリーモデルを読み込み中…',
       'session.title': 'このセッション',
       'session.loading': 'セッション消費を読み込み中…',
@@ -111,7 +120,7 @@ window.__ModuleLoader__.load({
       'usage.title': 'OpenCode Go usage',
       'usage.titleUnconfigured': 'OpenCode Go usage is unavailable',
       'usage.titleError': 'Could not read the OpenCode Go usage',
-      'usage.envNote': 'Set the Go API key in the {env} environment variable to show it here.',
+      'usage.envNote': 'Set the Go API key as {env} in the credential store or the environment to show it here.',
       'usage.rolling': '5-hour window',
       'usage.weekly': 'Weekly',
       'usage.monthly': 'Monthly',
@@ -122,11 +131,19 @@ window.__ModuleLoader__.load({
       'free.title': 'Limited-time free models',
       'free.checked': 'Checked at',
       'free.count': '{count} free',
+      'free.badge': 'FREE',
       'free.new': 'NEW',
       'free.newNote': 'Free models appeared since your last look; opening this list clears the markers.',
       'free.empty': 'No free models right now.',
       'free.error': 'Could not read the free-model list.',
       'free.note': 'The Host half polls the public model list. Free models do not consume the Go allowance.',
+      'free.nowFree': 'Free right now',
+      'free.nowPaid': 'Paid ({price}/Mtok input)',
+      'free.nowPaidUnknown': 'Paid (no published price)',
+      'free.historyTitle': 'Recent changes',
+      'free.added': '{name} became free',
+      'free.removed': '{name} is no longer free',
+      'free.historyNote': 'The Host watch records free-model additions and removals; the history covers this host run.',
       'free.loading': 'Loading free models…',
       'session.title': 'This session',
       'session.loading': 'Loading session spend…',
@@ -255,6 +272,11 @@ window.__ModuleLoader__.load({
   background: var(--dsw-alias-interactive-bg-hover);
 }
 .ogq-free-tag[data-new='true'] { color: var(--dsw-alias-state-warn-primary); }
+.ogq-watch-rows dd[data-free='true'] { color: var(--dsw-alias-state-success-primary, var(--dsw-alias-state-warn-primary)); }
+.ogq-history { margin-top: 8px; }
+.ogq-history-head { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.ogq-history-row .ogq-history-at { margin-left: auto; flex: none; color: var(--dsw-alias-label-tertiary); font-size: 10px; }
+.ogq-history-row[data-kind='removed'] .ogq-history-text { color: var(--dsw-alias-label-tertiary); }
 `
 
     /** Coerce to a finite number, or 0. */
@@ -314,6 +336,31 @@ window.__ModuleLoader__.load({
         })
       } catch {
         return new Date(at).toISOString().slice(0, 16).replace('T', ' ')
+      }
+    }
+
+    /** Short local date and time for a watched-transition record. */
+    function stampTime(at) {
+      try {
+        return new Date(at).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        })
+      } catch {
+        return new Date(at).toISOString().slice(0, 16).replace('T', ' ')
+      }
+    }
+
+    /** A published per-million-token list price, for example `$0.15`. */
+    function listUsd(value) {
+      const amount = num(value)
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: 'USD',
+          maximumFractionDigits: 2,
+        }).format(amount)
+      } catch {
+        return `$${amount.toFixed(2)}`
       }
     }
 
@@ -505,17 +552,25 @@ window.__ModuleLoader__.load({
      * Fold the Host's free-model watch into panel content.
      * @param snapshot - the Host half's free answer.
      * @param t - namespace translate function.
-     * @returns state, models, and notes.
+     * @returns state, models, watched statuses, change history, and notes.
      */
     function describeFree(snapshot, t) {
+      const watchedOf = (raw) => (Array.isArray(raw) ? raw : [])
+        .filter(model => model !== null && typeof model === 'object' && typeof model.name === 'string')
+      const historyOf = (raw) => (Array.isArray(raw) ? raw : [])
+        .filter(entry => entry !== null && typeof entry === 'object'
+          && (entry.kind === 'added' || entry.kind === 'removed')
+          && Number.isFinite(entry.at))
       if (snapshot === null || typeof snapshot !== 'object') {
-        return { state: 'loading', models: [], newIds: [], notes: [t('free.loading')] }
+        return { state: 'loading', models: [], watched: [], history: [], newIds: new Set(), notes: [t('free.loading')] }
       }
       if (snapshot.state === 'error') {
         return {
           state: 'error',
           models: Array.isArray(snapshot.free) ? snapshot.free : [],
-          newIds: [],
+          watched: watchedOf(snapshot.watched),
+          history: historyOf(snapshot.history),
+          newIds: new Set(),
           notes: [
             t('free.error'),
             snapshot.error !== null && typeof snapshot.error === 'object' && typeof snapshot.error.message === 'string'
@@ -525,12 +580,15 @@ window.__ModuleLoader__.load({
         }
       }
       const models = Array.isArray(snapshot.free) ? snapshot.free : []
+      const watched = watchedOf(snapshot.watched)
+      const history = historyOf(snapshot.history)
       const newIds = new Set(Array.isArray(snapshot.newFree) ? snapshot.newFree.map(model => model?.id) : [])
       const notes = []
       if (newIds.size > 0) notes.push(t('free.newNote'))
       notes.push(t('free.note'))
+      if (history.length > 0) notes.push(t('free.historyNote'))
       if (typeof snapshot.fetchedAt === 'number') notes.push(`${t('free.checked')}: ${clockTime(snapshot.fetchedAt)}`)
-      return { state: models.length === 0 ? 'empty' : 'ok', models, newIds, notes }
+      return { state: models.length === 0 ? 'empty' : 'ok', models, watched, history, newIds, notes }
     }
 
     /** A gauge glyph, drawn from the current text color. */
@@ -755,13 +813,27 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** The panel's free-model block: the watched list with NEW markers. */
+    /** The panel's free-model block: watched statuses, the list, and the change history. */
     function FreeSection({ view, t }) {
+      const watched = view.watched.filter(model => model.id !== undefined)
+      const history = view.history.slice(0, 6)
       return h('section', { className: 'ogq-free', 'data-opencode-free': view.state },
         h('div', { className: 'ogq-free-head' },
           h('span', { className: 'ogq-panel-title' }, t('free.title')),
           h('span', { className: 'ogq-panel-value' },
             t('free.count', { count: String(view.models.length) }))),
+        watched.length > 0 ? h('dl', { className: 'ogq-rows ogq-rows-plain ogq-watch-rows' },
+          watched.flatMap((model, index) => [
+            h('dt', { key: `watch-label-${String(index)}` }, model.name),
+            h('dd', {
+              key: `watch-value-${String(index)}`,
+              'data-free': model.free === true ? 'true' : 'false',
+            }, model.free === true
+              ? t('free.nowFree')
+              : typeof model.inputPrice === 'number'
+                ? t('free.nowPaid', { price: listUsd(model.inputPrice) })
+                : t('free.nowPaidUnknown')),
+          ])) : null,
         view.state === 'empty' ? h('p', { className: 'ogq-note' }, t('free.empty')) : null,
         view.models.length > 0 ? h('ul', { className: 'ogq-free-list' },
           view.models.map((model, index) => h('li', { key: model.id ?? String(index) },
@@ -770,6 +842,20 @@ window.__ModuleLoader__.load({
             model.limitedRegions === true ? h('span', { className: 'ogq-free-tag' }, 'geo') : null,
             model.training === true ? h('span', { className: 'ogq-free-tag' }, 'training') : null,
           ))) : null,
+        history.length > 0 ? h('div', { className: 'ogq-history' },
+          h('div', { className: 'ogq-history-head' }, t('free.historyTitle')),
+          h('ul', { className: 'ogq-free-list' },
+            history.map((entry, index) => h('li', {
+              key: `history-${String(index)}`,
+              className: 'ogq-history-row',
+              'data-kind': entry.kind,
+            },
+            h('span', { className: 'ogq-history-text' },
+              entry.kind === 'added'
+                ? t('free.added', { name: entry.name ?? entry.id ?? '' })
+                : t('free.removed', { name: entry.name ?? entry.id ?? '' })),
+            h('span', { className: 'ogq-history-at' }, stampTime(entry.at)),
+            )))) : null,
         view.notes.map((note, index) => h('p', {
           key: `free-note-${String(index)}`,
           className: 'ogq-note',
@@ -803,7 +889,15 @@ window.__ModuleLoader__.load({
       }, [panel.open, ackKey, readFree])
 
       const worstTone = view.tone
-      const showFreeBadge = freeView.newIds.size > 0
+      // Badge priority: a watched model is free right now > new free models >
+      // the current free-model count, so the free windows stay visible without
+      // opening the panel.
+      const watchedFree = freeView.watched.some(model => model.free === true)
+      const badgeText = watchedFree
+        ? t('free.badge')
+        : freeView.newIds.size > 0
+          ? `+${String(freeView.newIds.size)}`
+          : freeView.models.length > 0 ? String(freeView.models.length) : null
       return h(React.Fragment, null,
         h('button', {
           type: 'button',
@@ -811,11 +905,12 @@ window.__ModuleLoader__.load({
           className: 'ogq-chip',
           'data-tone': worstTone,
           'data-opencode-usage': worstTone,
+          'data-opencode-free': watchedFree ? 'true' : 'false',
           'aria-haspopup': 'dialog',
           'aria-expanded': panel.open,
           onClick: panel.toggle,
         }, h(GaugeIcon), h('span', { className: 'ogq-label' }, view.label),
-        showFreeBadge ? h('span', { className: 'ogq-free-badge' }, `+${String(freeView.newIds.size)}`) : null),
+        badgeText !== null ? h('span', { className: 'ogq-free-badge' }, badgeText) : null),
         panel.open && panel.placement !== null ? createPortal(
           h('div', {
             ref: panel.panelRef,

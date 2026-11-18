@@ -15,3 +15,8 @@
         # attributed per request/header and compaction summary, so mixing other
         # providers in one Session does not charge their tokens here.
         provider: opencode-go
+        # Models whose free windows the chip calls out by name. A name matches
+        # the list row id or the bare name of its canonical id, so a
+        # limited-time "-free" variant also flips its paid sibling to 無料.
+        watchModels:
+          - glm-5.3-flash

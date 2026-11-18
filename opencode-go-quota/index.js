@@ -42,6 +42,9 @@ const MIN_REFRESH_SECONDS = 60
 /** The free-model watcher polls the public list at most this often. */
 const MIN_FREE_REFRESH_SECONDS = 300
 
+/** Newest-first cap on the remembered free-model transitions. */
+const FREE_HISTORY_LIMIT = 24
+
 /** A hung upstream read must not pin the rest of the polling loop. */
 const REQUEST_TIMEOUT_MS = 15_000
 
@@ -51,6 +54,7 @@ const DEFAULTS = {
   refreshSeconds: 60,
   freeRefreshSeconds: 600,
   provider: 'opencode-go',
+  watchModels: [],
 }
 
 /**
@@ -143,6 +147,7 @@ export async function apply(ctx, config) {
   const freeTtlMs = freeRefreshSeconds * 1_000
   const provider = (nonEmpty(options.provider) ?? DEFAULTS.provider).toLowerCase()
   const prices = mergePriceOverrides(MODEL_PRICES, options.prices)
+  const watchModels = parseWatchModels(options.watchModels)
 
   /**
    * Host-only Session projection. Keeping the fold in the projection seam makes
@@ -163,7 +168,17 @@ export async function apply(ctx, config) {
   let usageInflight = null
 
   /** Free-model watcher state: the ids seen at the last successful read. */
-  let freeState = { free: [], newFree: [], checkedAt: 0, seenIds: [], fetchedOnce: false }
+  let freeState = {
+    free: [],
+    newFree: [],
+    checkedAt: 0,
+    seenIds: [],
+    fetchedOnce: false,
+    watched: [],
+    history: [],
+    names: {},
+    firstSeen: {},
+  }
   let freeFetchedAt = 0
   let freeInflight = null
 
@@ -342,18 +357,37 @@ export async function apply(ctx, config) {
       try {
         const answer = await requestFreeModels()
         if (answer.kind === 'ok') {
+          const now = Date.now()
           const seen = new Set(freeState.seenIds)
           const fresh = freeState.fetchedOnce
             ? answer.free.filter(model => !seen.has(model.id))
             : []
+          const gone = freeState.fetchedOnce
+            ? [...seen].filter(id => !answer.free.some(model => model.id === id))
+            : []
+          const history = [...freeState.history]
+          for (const model of fresh) {
+            history.unshift({ at: now, kind: 'added', id: model.id, name: model.name })
+          }
+          for (const id of gone) {
+            history.unshift({ at: now, kind: 'removed', id, name: freeState.names[id] ?? id })
+          }
+          const firstSeen = { ...freeState.firstSeen }
+          for (const model of answer.free) {
+            if (firstSeen[model.id] === undefined) firstSeen[model.id] = now
+          }
           freeState = {
             free: answer.free,
             newFree: fresh,
-            checkedAt: Date.now(),
+            checkedAt: now,
             seenIds: answer.free.map(model => model.id),
             fetchedOnce: true,
+            watched: answer.watched,
+            history: history.slice(0, FREE_HISTORY_LIMIT),
+            names: Object.fromEntries(answer.free.map(model => [model.id, model.name])),
+            firstSeen,
           }
-          freeFetchedAt = Date.now()
+          freeFetchedAt = now
           return freeSnapshot('ok')
         }
         return freeSnapshot('error', answer.error)
@@ -380,15 +414,23 @@ export async function apply(ctx, config) {
       state,
       fetchedAt: freeState.checkedAt === 0 ? null : freeState.checkedAt,
       stale: state === 'error' && freeState.fetchedOnce,
-      free: freeState.free,
+      free: freeState.free.map(model => ({
+        ...model,
+        since: freeState.firstSeen[model.id] ?? null,
+      })),
+      watched: freeState.watched,
+      history: freeState.history,
       newFree: freeState.newFree,
       error: error ?? null,
     }
   }
 
   /**
-   * Resolve the Go API key from the credential store, then from the ambient environment.
-   * Resolution is per call, so a rotated key reaches the next poll without a restart.
+   * Resolve the Go API key from the credential store, then from the launch
+   * environment (process, project `.env`, user `.env` — the same chain the
+   * OpenCode Go adapter uses), and finally from the ambient process
+   * environment. Resolution is per call, so a rotated key reaches the next
+   * poll without a restart.
    * @returns the key, or undefined while unconfigured.
    */
   async function resolveApiKey() {
@@ -398,9 +440,12 @@ export async function apply(ctx, config) {
         const resolved = await credentials.resolve(apiKeyEnv)
         if (resolved !== undefined && nonEmpty(resolved.value) !== undefined) return resolved.value
       } catch {
-        // A credential-store failure falls through to the ambient environment.
+        // A credential-store failure falls through to the environment layers.
       }
     }
+    const launch = ctx.get('launchEnvironment')
+    const hit = typeof launch?.get === 'function' ? launch.get(apiKeyEnv) : undefined
+    if (hit !== undefined && nonEmpty(hit?.value) !== undefined) return hit.value
     return nonEmpty(process.env[apiKeyEnv])
   }
 
@@ -443,8 +488,9 @@ export async function apply(ctx, config) {
    * Read the public Go models list and extract the limited-time free models.
    * A model is free when its published input and output token prices are both
    * zero; that is exactly how the list marks the `* Free` models, and such
-   * models also carry no Go monthly usage.
-   * @returns the free models, or a typed failure.
+   * models also carry no Go monthly usage. The same read resolves the watched
+   * models' current free status for the chip's badge.
+   * @returns the free models with watched statuses, or a typed failure.
    */
   async function requestFreeModels() {
     let response
@@ -472,18 +518,26 @@ export async function apply(ctx, config) {
     if (rows.length === 0) {
       return { kind: 'error', error: { code: 'unexpected-shape', message: 'models response carried no entries' } }
     }
-    const free = rows
-      .filter(isFreeModel)
+    const enriched = rows
       .map(model => ({
+        raw: model,
         id: text(model.id),
         name: nonEmpty(model.name) ?? text(model.id),
-        description: nonEmpty(model.description) ?? null,
-        limitedRegions: model.go?.limited_regions === true,
-        training: model.go?.training === true,
+        canonical: nonEmpty(model.canonical_id) ?? null,
       }))
       .filter(model => model.id !== '')
+    const free = enriched
+      .filter(model => isFreeModel(model.raw))
+      .map(model => ({
+        id: model.id,
+        name: model.name,
+        canonical: model.canonical,
+        description: nonEmpty(model.raw.description) ?? null,
+        limitedRegions: model.raw.go?.limited_regions === true,
+        training: model.raw.go?.training === true,
+      }))
       .sort((left, right) => left.id.localeCompare(right.id))
-    return { kind: 'ok', free }
+    return { kind: 'ok', free, watched: collectWatched(enriched, watchModels) }
   }
 }
 
@@ -503,6 +557,53 @@ function isFreeModel(model) {
   const inputPrice = input !== null && typeof input === 'object' ? input.price : undefined
   const outputPrice = output !== null && typeof output === 'object' ? output.price : undefined
   return inputPrice === 0 && outputPrice === 0
+}
+
+/**
+ * Parse the configured watched model names: lower-case, non-empty, unique.
+ * @param value - the row's `watchModels` config.
+ * @returns the names to report free status for.
+ */
+function parseWatchModels(value) {
+  if (!Array.isArray(value)) return []
+  const names = []
+  for (const entry of value) {
+    const name = typeof entry === 'string' ? entry.trim().toLowerCase() : ''
+    if (name !== '' && !names.includes(name)) names.push(name)
+  }
+  return names
+}
+
+/**
+ * Resolve the watched models' current free status from one models-list read.
+ * A watch name matches the row's id, or the bare name of its canonical id, so
+ * a limited-time `-free` variant published with a paid sibling's canonical id
+ * (for example `hy4-flash-free` over `tencent/hy4-flash`) reports that sibling
+ * as free while the paid rows keep their prices.
+ * @param rows - enriched models-list entries.
+ * @param watchModels - configured watch names.
+ * @returns one wire row per matched watch name.
+ */
+function collectWatched(rows, watchModels) {
+  const watched = []
+  for (const watchName of watchModels) {
+    const match = rows.find(row => row.id === watchName
+      || (row.canonical !== null && row.canonical.split('/').pop() === watchName))
+    if (match === undefined) continue
+    const free = isFreeModel(match.raw)
+    const cost = match.raw?.cost?.text
+    const inputPrice = finite(cost?.input?.price)
+    const outputPrice = finite(cost?.output?.price)
+    watched.push({
+      id: match.id,
+      name: match.name,
+      canonical: match.canonical,
+      free,
+      inputPrice: free ? 0 : inputPrice ?? null,
+      outputPrice: free ? 0 : outputPrice ?? null,
+    })
+  }
+  return watched
 }
 
 /** A flat published price row, USD per million tokens. */

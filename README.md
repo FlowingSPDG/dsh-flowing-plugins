@@ -160,11 +160,21 @@ One chip for [OpenCode Go](https://opencode.ai/docs/console/go/):
 - **Free-model watch** — the Host half polls the public
   `GET https://opencode.ai/inference/go/v1/models` list (no key needed) every
   10 minutes and tracks the limited-time free models, the ones whose published
-  input and output token prices are both zero. When a new free model appears
-  since your last look, the chip grows a green `+N` badge and the card's free
-  list marks the arrivals `新` / `NEW`; opening the card acknowledges them.
-  Each row also tags geo-restricted (`geo`) and training-consent (`training`)
-  models.
+  input and output token prices are both zero. The chip always shows how many
+  models are free right now — `無料` / `FREE` when a watched model is free, a
+  green `+N` badge when new ones arrived since your last look, otherwise the
+  plain count. The card's free list marks the arrivals `新` / `NEW`; opening
+  the card acknowledges them. Each row also tags geo-restricted (`geo`) and
+  training-consent (`training`) models.
+- **Watched free windows** — `watchModels` (the shipped configuration watches
+  `glm-5.3-flash`) names the models whose free windows should be called out by
+  name. A watch name matches the list row's id or the bare name of its
+  canonical id, so a limited-time `-free` variant published over a paid
+  sibling's canonical id (for example `hy4-flash-free` over
+  `tencent/hy4-flash`) also flips that sibling to 無料. The card shows each
+  watched model as 現在無料 or 現在有料 with its published input list price,
+  and a 最近の変化 / recent-changes list records when the watcher saw a model
+  become free or paid again (in-memory, so it covers the current host run).
 
 ### About peak time
 
@@ -217,6 +227,7 @@ restate the keys you keep):
     refreshSeconds: 60                 # Host cache window for usage; minimum 60
     freeRefreshSeconds: 600            # free-model watch cadence; minimum 300
     provider: opencode-go              # provider id whose calls count toward the allowance
+    watchModels: [glm-5.3-flash]       # models whose free windows the chip calls out
     # prices:                          # optional overrides/additions, USD per million tokens
     #   my-new-model: { input: 0.30, cached: 0.006, output: 1.20 }
 ```
@@ -227,8 +238,10 @@ the long-context tiers. If OpenCode changes a price or adds a model, override
 that row in your profile rather than editing the package.
 
 Set the key once, either through the DSH credential store (the Models settings
-page writes provider keys there) or as `OPENCODE_GO_API_KEY` in the environment
-that launches `dsh`. The free-model watch needs no key and no configuration.
+page writes provider keys there), or in the launch environment — the same
+process / project `.env` / user `.env` chain the OpenCode Go adapter resolves —
+or as `OPENCODE_GO_API_KEY` in the ambient environment. The free-model watch
+needs no key and no configuration.
 
 ## Package layout
 

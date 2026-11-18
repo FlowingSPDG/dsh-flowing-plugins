@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "OpenCode Go Usage",
-    "description": "Shows OpenCode Go usage (5-hour/weekly/monthly), this Session's estimated allowance spend, and the limited-time free-model watch on the composer's stats row."
+    "description": "Shows OpenCode Go usage (5-hour/weekly/monthly), this Session's estimated allowance spend, the watched models' free windows (e.g. GLM-5.3-Flash), and the limited-time free-model watch on the composer's stats row."
   }
 }
