@@ -1,0 +1,17 @@
+- insert:
+    - id: opencode-go-quota
+      name: '@local/opencode-go-quota'
+      config:
+        # Credential reference holding the OpenCode Go API key, and how long the
+        # Host caches one usage answer. Keep refreshSeconds at 60 or more; the
+        # endpoint's own rate limit is undocumented.
+        apiKeyEnv: OPENCODE_API_KEY
+        baseUrl: https://opencode.ai
+        refreshSeconds: 60
+        # How often the Host re-reads the public Go models list for the
+        # limited-time free-model watcher; minimum 300.
+        freeRefreshSeconds: 600
+        # Route id whose calls count toward the Go allowance. Session usage is
+        # attributed per request/header and compaction summary, so mixing other
+        # providers in one Session does not charge their tokens here.
+        provider: opencode-go
