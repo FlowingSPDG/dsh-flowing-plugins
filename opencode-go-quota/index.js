@@ -542,12 +542,16 @@ export async function apply(ctx, config) {
 }
 
 /**
- * Whether one models-list row is a limited-time free model.
+ * Whether one models-list row is a limited-time free model. Zero published
+ * input and output token prices are the list's own marker; a `-free` id
+ * suffix is the naming convention for the same thing, so it counts as free
+ * even if a future listing carries non-zero prices on such a row.
  * @param model - raw models-list entry.
- * @returns true for a published zero-price chat model.
+ * @returns true for a published free chat model.
  */
 function isFreeModel(model) {
   if (model === null || typeof model !== 'object') return false
+  if (hasFreeSuffix(model.id)) return true
   const cost = model.cost
   if (cost === null || typeof cost !== 'object') return false
   const textCost = cost.text
@@ -557,6 +561,15 @@ function isFreeModel(model) {
   const inputPrice = input !== null && typeof input === 'object' ? input.price : undefined
   const outputPrice = output !== null && typeof output === 'object' ? output.price : undefined
   return inputPrice === 0 && outputPrice === 0
+}
+
+/**
+ * Whether a routed model id carries OpenCode's limited-time free suffix.
+ * @param modelId - routed model id.
+ * @returns true for ids ending in `-free`.
+ */
+function hasFreeSuffix(modelId) {
+  return typeof modelId === 'string' && modelId.trim().toLowerCase().endsWith('-free')
 }
 
 /**
@@ -588,7 +601,8 @@ function collectWatched(rows, watchModels) {
   const watched = []
   for (const watchName of watchModels) {
     const match = rows.find(row => row.id === watchName
-      || (row.canonical !== null && row.canonical.split('/').pop() === watchName))
+      || (row.canonical !== null && row.canonical.split('/').pop() === watchName)
+      || (hasFreeSuffix(row.id) && row.id.slice(0, -'-free'.length) === watchName))
     if (match === undefined) continue
     const free = isFreeModel(match.raw)
     const cost = match.raw?.cost?.text
@@ -887,11 +901,16 @@ function recordOf(event, providerId, modelId, sample, kind, prices, configuredPr
   const provider = providerId === '' ? 'unknown' : providerId
   const model = modelId === '' ? 'unknown' : modelId
   const resolved = priceFor(model, at, input + cacheRead + cacheWrite, prices)
-  const cost = resolved === undefined
-    ? null
-    : ((input + cacheWrite) * resolved.price.input
-      + cacheRead * resolved.price.cached
-      + output * resolved.price.output) / 1_000_000
+  // A `-free` id is the published limited-time free naming convention: it
+  // costs nothing against the allowance even when no list price is known.
+  const freeVariant = hasFreeSuffix(model)
+  const cost = freeVariant
+    ? 0
+    : resolved === undefined
+      ? null
+      : ((input + cacheWrite) * resolved.price.input
+        + cacheRead * resolved.price.cached
+        + output * resolved.price.output) / 1_000_000
   return {
     turn: count(event.data?.turn),
     step: count(event.data?.step),
@@ -907,8 +926,8 @@ function recordOf(event, providerId, modelId, sample, kind, prices, configuredPr
     cacheWrite,
     total: input + output + cacheRead + cacheWrite,
     cost,
-    peak: resolved?.peak === true,
-    free: resolved !== undefined && resolved.price.input === 0 && resolved.price.output === 0,
+    peak: !freeVariant && resolved?.peak === true,
+    free: freeVariant || (resolved !== undefined && resolved.price.input === 0 && resolved.price.output === 0),
     at,
   }
 }

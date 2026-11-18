@@ -156,11 +156,14 @@ One chip for [OpenCode Go](https://opencode.ai/docs/console/go/):
   documented time multipliers at each record's timestamp and the long-context
   tiers. It reads the durable Session log, so usage from before a context
   compaction is included, and model switches inside one Session are counted
-  per model; free models are tagged `無料` / `free` and cost zero.
+  per model; free models are tagged `無料` / `free` and cost zero, and a model
+  id ending in `-free` counts as free even when no list price is published.
 - **Free-model watch** — the Host half polls the public
   `GET https://opencode.ai/inference/go/v1/models` list (no key needed) every
-  10 minutes and tracks the limited-time free models, the ones whose published
-  input and output token prices are both zero. The chip always shows how many
+  10 minutes and tracks the limited-time free models: rows whose published
+  input and output token prices are both zero, and rows whose id carries the
+  `-free` naming suffix (so a future `-free` listing with non-zero prices
+  still counts as free). The chip always shows how many
   models are free right now — `無料` / `FREE` when a watched model is free, a
   green `+N` badge when new ones arrived since your last look, otherwise the
   plain count. The card's free list marks the arrivals `新` / `NEW`; opening
